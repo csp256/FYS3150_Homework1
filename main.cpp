@@ -8,8 +8,8 @@ using namespace std;
 using namespace arma;
 
 int main() {
-    const int n = pow(10,5);
-    std::cout << "n: 10^" << log10(n) << endl;
+    const int n = pow(10,1);
+    std::cout << "n: 10^" << log10(n) << endl << endl;
     const float h  = 1.0f / ((float) n + 1.0f); // h is the spacing between discretized points
     const float h2 = h*h;
     float x; // x is a spatial coordinate
@@ -28,13 +28,14 @@ int main() {
     start = clock();
     v = poissonSolver(b);
     finish = clock();
-    cout << "Time: " << finish-start << "us" << endl;
+    cout << "My poissonSolver()" << endl;
+    cout << "Time:      " << finish-start << "us" << endl;
 
     // Find common log of the solver's largest deviation from the analytic solution.
     float maxError = -FLT_MAX;
     float temp;
     for (int i=0; i<n; ++i) {
-        temp = abs(v(i) - u(i));
+        temp = abs((v(i) - u(i))/u(i));
         if (maxError < temp) {
             maxError = temp;
         }
@@ -43,27 +44,31 @@ int main() {
     cout << "maxError: " << maxError << endl << endl;
 
     // Compare with Armadillo.
-    mat A(n,n);
-    A.zeros();
-    A.diag( 0)  +=  2.0f;
-    A.diag(-1)  += -1.0f;
-    A.diag( 1)  += -1.0f;
-    colvec B(n), X(n);
-    for (int i=0; i<n; ++i) {
-        B(i) = b(i);
-    }
-    start = clock();
-    X = solve(A, B);
-    finish = clock();
-    cout << "Time: " << (finish-start)/1000 << "ms" << endl;
-    maxError = -FLT_MAX;
-    for (int i=0; i<n; ++i) {
-        temp = abs(X(i) - u(i));
-        if (maxError < temp) {
-            maxError = temp;
+    if (log10(n) <= 4.1) { // Without sparse matrices, Armadillo cannot handle large 'n'.
+        cout << "Armadillo's solve()" << endl;
+        mat A(n,n);
+        A.zeros();
+        A.diag( 0)  +=  2.0f;
+        A.diag(-1)  += -1.0f;
+        A.diag( 1)  += -1.0f;
+        colvec B(n), X(n);
+        for (int i=0; i<n; ++i) {
+            B(i) = b(i); // Easiest way around an annoying type error.
         }
+        start = clock();
+        X = solve(A, B);
+        finish = clock();
+        cout << "Time:      " << (finish-start) << "us" << endl;
+        maxError = -FLT_MAX;
+        for (int i=0; i<n; ++i) {
+            temp = abs((X(i) - u(i))/u(i));
+            if (maxError < temp) {
+                maxError = temp;
+            }
+        }
+        cout << "maxError: " << log10(maxError);
     }
-    cout << "Armadillo max deviation:" << endl << log10(maxError) << endl;
 
+    cout << endl << endl;
     return 0;
 }
