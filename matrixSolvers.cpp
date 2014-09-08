@@ -1,6 +1,6 @@
 #include <armadillo>
 
-using namespace arma;
+using namespace arma;//
 
 // This assumes a tridiagonal symmetric toeplitz matrix,
 // where the main diagonal is 2 and the off diagonals are -1.
