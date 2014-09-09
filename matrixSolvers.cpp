@@ -20,37 +20,28 @@ using namespace arma;
 // ------------------------------------------------------
 //                  3n          n                   4n FLOPs
 Col<float> poissonSolver(Col<float> q) {
-    const int n = q.n_elem; // n shall not be smaller than 3ish.
+    const int n = q.n_elem;
     Col<float> d(n); // The d vector occurs twice in the LU factorization, up to negation and multiplicative inversion.
     Col<float> y(n), x(n); // y is a temporary vector, and x is the final result.
 
     // Forward substitution.
-    y(0) = q(0);
-    int prev = 0;
-    int curr = 1;
     {
-        int next = 2;
-        float fcurr = 1.0f;
-        float fnext = 2.0f;
-        for (; curr<n;) {
-            d(prev) = fcurr / fnext;
-            y(curr) = fma(d(prev), y(prev), q(curr));
+        int prev=0,curr=1; // Better to let these fall out of scope and let compiler optimize backwards loop w/ variables of same name
+        y(0) = q(0);
+        for (float fcurr = 1.0f, fnext = 2.0f; curr<n; ++prev, ++curr) { // Compiler seems to optimize better with float declerations here
+            d(prev) = (fcurr) / (fnext); // This is a hell of a lot cheaper than normal LU decomp.
+            fcurr = (fnext); // Halves the number of float promotes necessary.
+            fnext = (float)(curr+2); // You save nearly 60% runtime by adding 2 here instead of adding 1 after ++curr !!
 
-            prev = curr;
-            curr = next++;
-            fcurr = fnext;
-            fnext = (float) (next);
+            y(curr) = fma(d(prev), y(prev), q(curr)); // Remember, we previously stored the NEGATIVE of 'l'!
         }
-        d(prev) = (fcurr) / (fnext);
+        d(prev) = (float)(curr) / (float)(curr+1); // Cost of the float promotes vanishes
     }
 
     // Backward substitution.
-    curr -= 2;
-    x(prev) = y(prev) * d(prev);
-    for (;0 <= curr;) {
+    x(n-1) = y(n-1) * d(n-1); // We stored the INVERSE of 'd'!
+    for (int curr=n-2, prev=n-1; 0<=curr; --prev,--curr) {
         x(curr) = (x(prev) + y(curr)) * d(curr);
-        prev = curr;
-        --curr;
     }
 
     return x;
