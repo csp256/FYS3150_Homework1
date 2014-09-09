@@ -1,6 +1,6 @@
 #include <armadillo>
 
-using namespace arma;//
+using namespace arma;
 
 // This assumes a tridiagonal symmetric toeplitz matrix,
 // where the main diagonal is 2 and the off diagonals are -1.
@@ -20,27 +20,37 @@ using namespace arma;//
 // ------------------------------------------------------
 //                  3n          n                   4n FLOPs
 Col<float> poissonSolver(Col<float> q) {
-    const int n = q.n_elem;
+    const int n = q.n_elem; // n shall not be smaller than 3ish.
     Col<float> d(n); // The d vector occurs twice in the LU factorization, up to negation and multiplicative inversion.
     Col<float> y(n), x(n); // y is a temporary vector, and x is the final result.
 
-    // LU decomposition
-    int j = 0;
-    for (int i=1; i<=n; ++i) {
-        d(j) = ((float)i) / (float)(i+1); // This is the INVERSE of 'd'! We store the reciprocals.
-        j = i;
-    }
-
     // Forward substitution.
     y(0) = q(0);
-    for (int i=1; i<n; ++i) {
-        y(i) = fma(d(i-1), y(i-1), q(i)); // Remember, we previously stored the NEGATIVE of 'l'!
+    int prev = 0;
+    int curr = 1;
+    {
+        int next = 2;
+        float fcurr = 1.0f;
+        float fnext = 2.0f;
+        for (; curr<n;) {
+            d(prev) = fcurr / fnext;
+            y(curr) = fma(d(prev), y(prev), q(curr));
+
+            prev = curr;
+            curr = next++;
+            fcurr = fnext;
+            fnext = (float) (next);
+        }
+        d(prev) = (fcurr) / (fnext);
     }
 
     // Backward substitution.
-    x(n-1) = y(n-1) * d(n-1); // We stored the INVERSE of 'd'!
-    for (int i=n-2; 0<=i; --i) {
-        x(i) = (x(i+1) + y(i)) * d(i);
+    curr -= 2;
+    x(prev) = y(prev) * d(prev);
+    for (;0 <= curr;) {
+        x(curr) = (x(prev) + y(curr)) * d(curr);
+        prev = curr;
+        --curr;
     }
 
     return x;
